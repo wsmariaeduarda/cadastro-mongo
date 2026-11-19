@@ -9,41 +9,87 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+$erro    = null;
+$sucesso = false;
+
 try {
     $estudanteId = new ObjectId($_POST['estudante_id']);
     $cursoId     = new ObjectId($_POST['curso_id']);
 } catch (Exception $e) {
-    exit('Selecione um estudante e um curso. <a href="matricula_form.php">Voltar</a>');
+    $erro = 'Selecione um estudante e um curso.';
 }
 
-$estudante = $banco->estudantes->findOne(['_id' => $estudanteId]);
-$curso     = $banco->cursos->findOne(['_id' => $cursoId]);
+if (!$erro) {
+    $estudante = $banco->estudantes->findOne(['_id' => $estudanteId]);
+    $curso     = $banco->cursos->findOne(['_id' => $cursoId]);
 
-if (!$estudante || !$curso) {
-    exit('Estudante ou curso não encontrado. <a href="matricula_form.php">Voltar</a>');
+    if (!$estudante || !$curso) {
+        $erro = 'Estudante ou curso não encontrado.';
+    }
 }
 
-$jaMatriculado = $banco->matriculas->countDocuments([
-    'estudante_id' => $estudanteId,
-    'curso_id'     => $cursoId,
-]);
+if (!$erro) {
+    $jaMatriculado = $banco->matriculas->countDocuments([
+        'estudante_id' => $estudanteId,
+        'curso_id'     => $cursoId,
+    ]);
 
-if ($jaMatriculado > 0) {
-    exit('Este estudante já está matriculado neste curso. <a href="matricula_form.php">Voltar</a>');
+    if ($jaMatriculado > 0) {
+        $erro = 'Este estudante já está matriculado neste curso.';
+    }
 }
 
-$ocupadas = $banco->matriculas->countDocuments(['curso_id' => $cursoId]);
+if (!$erro) {
+    $ocupadas = $banco->matriculas->countDocuments(['curso_id' => $cursoId]);
 
-if ($ocupadas >= $curso['vagas']) {
-    exit('Não há vagas neste curso. <a href="matricula_form.php">Voltar</a>');
+    if ($ocupadas >= $curso['vagas']) {
+        $erro = 'Não há vagas neste curso.';
+    }
 }
 
-$banco->matriculas->insertOne([
-    'estudante_id'   => $estudanteId,
-    'curso_id'       => $cursoId,
-    'data_matricula' => new UTCDateTime(),
-]);
+if (!$erro) {
+    $banco->matriculas->insertOne([
+        'estudante_id'   => $estudanteId,
+        'curso_id'       => $cursoId,
+        'data_matricula' => new UTCDateTime(),
+    ]);
+    $sucesso = true;
+}
+?>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?= $sucesso ? 'Matrícula realizada' : 'Matrícula não realizada' ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container mt-4 mb-5">
+    <h1>Sistema Acadêmico</h1>
 
-echo 'Matrícula realizada!';
-echo '<br><a href="matricula_form.php">Nova matrícula</a>';
-echo ' | <a href="matricula_listar.php">Ver matrículas</a>';
+    <?php if ($sucesso): ?>
+        <div class="alert alert-success mt-3" role="alert">
+            Matrícula realizada!
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <p class="card-text mb-1"><strong>Estudante:</strong> <?= htmlspecialchars($estudante['nome']) ?></p>
+                <p class="card-text mb-0"><strong>Curso:</strong> <?= htmlspecialchars($curso['nome']) ?></p>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="alert alert-danger mt-3" role="alert">
+            <?= htmlspecialchars($erro) ?>
+        </div>
+    <?php endif; ?>
+
+    <div class="mt-3">
+        <a href="matricula_form.php" class="btn btn-primary"><?= $sucesso ? 'Nova matrícula' : 'Voltar' ?></a>
+        <a href="matricula_listar.php" class="btn btn-outline-primary">Ver matrículas</a>
+        <a href="index.php" class="btn btn-outline-secondary">Início</a>
+    </div>
+</div>
+</body>
+</html>
